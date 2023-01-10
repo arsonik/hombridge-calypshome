@@ -45,12 +45,24 @@ export class CalypsHome {
         })
             .then((x) => x.json())
             .then((data) => {
+
+
+
                 const x = data[0][1]['objects'];
-                return x.map((g: any) => ({
-                    id: g.id,
-                    gw: g.gw,
-                    name: g.statuss.find((s: any) => s.statusname.endsWith('user_name'))?.status,
-                }));
+                return x.map((g: any) => {
+                    const kv = g.statuss.reduce((acc, s: any) => {
+                        acc[s.statusname.match(/\/([^/]+)$/)[1]] = s.status;
+                        return acc;
+                    }, {});
+                    return ({
+                        id: g.id,
+                        gw: g.gw,
+                        kv,
+                        name: kv['__user_name'],
+                        manufacturer: kv['manufacturer_name:'],
+                        // all: JSON.stringify(g)
+                    });
+                });
             });
     }
 
