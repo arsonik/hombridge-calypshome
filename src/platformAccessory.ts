@@ -41,25 +41,25 @@ export class CalypshomeAccessory {
 
         if (this.accessory.context.kv.angle !== undefined) {
             this.service.getCharacteristic(this.platform.Characteristic.CurrentHorizontalTiltAngle).onGet(this.getAngle.bind(this));
+            this.service.getCharacteristic(this.platform.Characteristic.TargetHorizontalTiltAngle).onSet(this.setAngle.bind(this));
         }
 
         this.service.getCharacteristic(this.platform.Characteristic.PositionState).onGet(this.getPositionState.bind(this));
         this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).onGet(this.getTargetPosition.bind(this)).onSet(this.setTargetPosition.bind(this));
-        this.service.getCharacteristic(this.platform.Characteristic.TargetHorizontalTiltAngle).onSet(this.setAngle.bind(this));
     }
 
     getAngle() {
-        // this.platform.log.debug('Triggered GET handleGetAngle', this.accessory.context.name, this.accessory.context.kv.angle);
+        this.platform.log.debug('Triggered getAngle', this.accessory.context.name, this.accessory.context.kv.angle);
         return Number(this.accessory.context.kv.angle);
     }
 
     getCurrentPosition() {
-        // this.platform.log.debug('Triggered GET CurrentPosition', this.accessory.context.name, this.accessory.context.kv.status);
+        this.platform.log.debug('Triggered getCurrentPosition', this.accessory.context.name, this.accessory.context.kv.level);
         return Number(this.accessory.context.kv.level);
     }
 
     getPositionState() {
-        // this.platform.log.debug('Triggered GET CurrentPosition', this.accessory.context.name, this.accessory.context.device);
+        // this.platform.log.debug('Triggered getPositionState', this.accessory.context.name, this.accessory.context);
         return this.platform.Characteristic.PositionState.STOPPED;
     }
 

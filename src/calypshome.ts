@@ -51,7 +51,12 @@ export class CalypsHome {
                     },
                 })
                     .then((x) => x.json())
-                    .then((data: any) => data[0][1]['objects'] as { id: number; gw: string; statuss: { statusname: string; status: string }[] }[])
+                    .then((data: { objects?: { id: number; gw: string; name: string; statuss: { statusname: string; status: string }[] }; alias: string; isconnected: boolean }[][]) =>
+                        data[0]
+                            .map((x) => x.objects ?? [])
+                            .flat()
+                            .filter((x) => x.gw !== 'System')
+                    )
                     .then((x) => {
                         this.lastUpdate = new Date().getTime();
                         return x.map((g) => {

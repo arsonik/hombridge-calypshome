@@ -51,11 +51,3 @@ npm version prepatch --preid beta
 # publish to @beta
 npm publish --tag=beta
 ```
-
-Users can then install the  *beta* version by appending `@beta` to the install command, for example:
-
-```
-sudo npm install -g homebridge-example-plugin@beta
-```
-
-

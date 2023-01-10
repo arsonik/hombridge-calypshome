@@ -14,9 +14,10 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         this.log.debug('Finished initializing platform:', this.config.name);
 
         this.calypshome = new CalypsHome(this.config as any, log);
-        this.api.on('didFinishLaunching', async () => {
+        this.api.on('didFinishLaunching', () => {
             log.debug('Executed didFinishLaunching callback');
-            await this.discoverDevices();
+            void this.discoverDevices();
+            setInterval(() => void this.updateDevices(), 60 * 1000 * 10);
         });
     }
 
@@ -55,6 +56,26 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
                     new CalypshomeAccessory(this, accessory);
 
                     this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+                }
+            });
+        });
+    }
+
+    updateDevices() {
+        return this.calypshome.devices().then((devices) => {
+            devices.forEach((device) => {
+                const uuid = this.api.hap.uuid.generate(device.id.toString());
+                const accessory = this.accessories.find((a) => a.UUID === uuid);
+                const service = accessory?.getService(this.Service.WindowCovering);
+                if (accessory && service) {
+                    if (device.kv.__user_name === 'Office') {
+                        this.log.debug('updateDevices', device.kv.__user_name, device.kv.level, device.kv.angle);
+                    }
+
+                    service.getCharacteristic(this.Characteristic.CurrentPosition).updateValue(device.kv.level);
+                    if (device.kv.angle !== undefined) {
+                        service.getCharacteristic(this.Characteristic.CurrentHorizontalTiltAngle).updateValue(device.kv.angle);
+                    }
                 }
             });
         });
