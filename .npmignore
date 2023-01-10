@@ -12,8 +12,11 @@ src
 # typescript
 tsconfig.json
 
-# vscode
+# IDEs
 .vscode
+.idea
+.nvmrc
+.prettierrc.json
 
 # nodemon
 nodemon.json

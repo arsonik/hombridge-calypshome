@@ -1,151 +1,82 @@
-import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
+import { Service, PlatformAccessory } from 'homebridge';
+import { CalypshomePlatform } from './platform';
 
-import { ExampleHomebridgePlatform } from './platform';
+export type DeviceType = {
+    id: number;
+    gw: string;
+    kv: {
+        level: string;
+        __user_name: string;
+        alert_message: string;
+        manufacturer_name: string;
+        product_name: string;
+        angle?: string;
+        present: string;
+        status: 'down' | 'up';
+    };
+    name: string;
+    manufacturer: string;
+};
 
 /**
  * Platform Accessory
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class ExamplePlatformAccessory {
+export class CalypshomeAccessory {
     private service: Service;
 
-    /**
-     * These are just used to create a working example
-     * You should implement your own code to track the state of your accessory
-     */
-    private exampleStates = {
-        On: false,
-        Brightness: 100,
-    };
-
-    constructor(
-        private readonly platform: ExampleHomebridgePlatform,
-        private readonly accessory: PlatformAccessory,
-    ) {
-
+    constructor(private readonly platform: CalypshomePlatform, private readonly accessory: PlatformAccessory<DeviceType>) {
         // set accessory information
-        this.accessory.getService(this.platform.Service.AccessoryInformation)!
-            .setCharacteristic(this.platform.Characteristic.Manufacturer, this.accessory.context.device.manufacturer)
-            .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-            .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+        this.accessory.getService(this.platform.Service.AccessoryInformation)!.setCharacteristic(this.platform.Characteristic.Manufacturer, this.accessory.context.manufacturer);
+        // .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
+        // .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
 
-        // get the LightBulb service if it exists, otherwise create a new LightBulb service
-        // you can create multiple services for each accessory
         this.service = this.accessory.getService(this.platform.Service.WindowCovering) || this.accessory.addService(this.platform.Service.WindowCovering);
 
-        // set the service name, this is what is displayed as the default name on the Home app
-        // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-        this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
+        this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.name);
 
-        // each service must implement at-minimum the "required characteristics" for the given service type
-        // see https://developers.homebridge.io/#/service/Lightbulb
-
+        // @see https://developers.homebridge.io/#/characteristic/TargetPosition
 
         // create handlers for required characteristics
-        this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition)
-            // .onGet(this.handleCurrentPositionGet.bind(this));
+        this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).onGet(this.getCurrentPosition.bind(this));
 
-        this.service.getCharacteristic(this.platform.Characteristic.PositionState)
-            // .onGet(this.handlePositionStateGet.bind(this));
+        if (this.accessory.context.kv.angle !== undefined) {
+            this.service.getCharacteristic(this.platform.Characteristic.CurrentHorizontalTiltAngle).onGet(this.getAngle.bind(this));
+        }
 
-        this.service.getCharacteristic(this.platform.Characteristic.TargetPosition)
-            // .onGet(this.handleTargetPositionGet.bind(this))
-            // .onSet(this.handleTargetPositionSet.bind(this));
-
-        // // register handlers for the On/Off Characteristic
-        // this.service.getCharacteristic(this.platform.Characteristic.On)
-        //     .onSet(this.setOn.bind(this))                // SET - bind to the `setOn` method below
-        //     .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
-        //
-        // // register handlers for the Brightness Characteristic
-        // this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-        //     .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
-
-        /**
-         * Creating multiple services of the same type.
-         *
-         * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-         * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-         * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-         *
-         * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-         * can use the same sub type id.)
-         */
-
-            // Example: add two "motion sensor" services to the accessory
-        // const motionSensorOneService = this.accessory.getService('Motion Sensor One Name') ||
-        //         this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
-        //
-        // const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name') ||
-        //     this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
-
-        /**
-         * Updating characteristics values asynchronously.
-         *
-         * Example showing how to update the state of a Characteristic asynchronously instead
-         * of using the `on('get')` handlers.
-         * Here we change update the motion sensor trigger states on and off every 10 seconds
-         * the `updateCharacteristic` method.
-         *
-         */
-        setInterval(() => {
-            // EXAMPLE - inverse the trigger
-
-            // push the new value to HomeKit
-            // motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-            // motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
-
-            // this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-            // this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-        }, 30000);
+        this.service.getCharacteristic(this.platform.Characteristic.PositionState).onGet(this.getPositionState.bind(this));
+        this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).onGet(this.getTargetPosition.bind(this)).onSet(this.setTargetPosition.bind(this));
+        this.service.getCharacteristic(this.platform.Characteristic.TargetHorizontalTiltAngle).onSet(this.setAngle.bind(this));
     }
 
-    /**
-     * Handle "SET" requests from HomeKit
-     * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
-     */
-    async setOn(value: CharacteristicValue) {
-        // implement your own code to turn your device on/off
-        this.exampleStates.On = value as boolean;
-
-        this.platform.log.debug('Set Characteristic On ->', value);
+    getAngle() {
+        // this.platform.log.debug('Triggered GET handleGetAngle', this.accessory.context.name, this.accessory.context.kv.angle);
+        return Number(this.accessory.context.kv.angle);
     }
 
-    /**
-     * Handle the "GET" requests from HomeKit
-     * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-     *
-     * GET requests should return as fast as possbile. A long delay here will result in
-     * HomeKit being unresponsive and a bad user experience in general.
-     *
-     * If your device takes time to respond you should update the status of your device
-     * asynchronously instead using the `updateCharacteristic` method instead.
-
-     * @example
-     * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
-     */
-    async getOn(): Promise<CharacteristicValue> {
-        // implement your own code to check if the device is on
-        const isOn = this.exampleStates.On;
-
-        this.platform.log.debug('Get Characteristic On ->', isOn);
-
-        // if you need to return an error to show the device as "Not Responding" in the Home app:
-        // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-
-        return isOn;
+    getCurrentPosition() {
+        // this.platform.log.debug('Triggered GET CurrentPosition', this.accessory.context.name, this.accessory.context.kv.status);
+        return Number(this.accessory.context.kv.level);
     }
 
-    /**
-     * Handle "SET" requests from HomeKit
-     * These are sent when the user changes the state of an accessory, for example, changing the Brightness
-     */
-    async setBrightness(value: CharacteristicValue) {
-        // implement your own code to set the brightness
-        this.exampleStates.Brightness = value as number;
-
-        this.platform.log.debug('Set Characteristic Brightness -> ', value);
+    getPositionState() {
+        // this.platform.log.debug('Triggered GET CurrentPosition', this.accessory.context.name, this.accessory.context.device);
+        return this.platform.Characteristic.PositionState.STOPPED;
     }
 
+    getTargetPosition() {
+        // this.platform.log.debug('Triggered GET TargetPosition');
+        return this.getCurrentPosition();
+    }
+
+    setTargetPosition(value) {
+        this.platform.log.debug('SET TargetPosition', this.accessory.displayName, value);
+        this.platform.calypshome.action({ id: this.accessory.context.id, gw: this.accessory.context.gw }, 'LEVEL', `level=${value}`);
+    }
+
+    setAngle(value) {
+        this.platform.log.debug('SET setAngle', this.accessory.displayName, value);
+        this.platform.calypshome.action({ id: this.accessory.context.id, gw: this.accessory.context.gw }, 'TILT', `angle=${value}`);
+    }
 }
