@@ -25,7 +25,10 @@
     "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [
-    "homebridge-plugin", "calyps'home", "calyps'home", "profalux"
+    "homebridge-plugin",
+    "calyps'home",
+    "calyps'home",
+    "profalux"
   ],
   "devDependencies": {
     "@ezweb/eslint-config": "^1.0.10",
