@@ -4,6 +4,7 @@ import { Logger } from 'homebridge';
 export class CalypsHome {
     url = 'https://ma.calypshome.com';
     private sessionId?: string;
+    lastUpdate?: number;
 
     constructor(private auth: { username: string; password: string }, public readonly log: Logger) {
         this.log.info('CalypsHome init');
@@ -45,8 +46,9 @@ export class CalypsHome {
                 },
             })
                 .then((x) => x.json())
-                .then((data) => {
-                    const x = data[0][1]['objects'] as { id: number; gw: string; statuss: { statusname: string; status: string }[] }[];
+                .then((data) => data[0][1]['objects'] as { id: number; gw: string; statuss: { statusname: string; status: string }[] }[])
+                .then((x) => {
+                    this.lastUpdate = new Date().getTime();
                     return x.map((g) => {
                         const kv = g.statuss.reduce((acc, s) => {
                             const m = s.statusname.match(/\/([^/]+)$/);
@@ -61,7 +63,7 @@ export class CalypsHome {
                             kv,
                             name: kv['__user_name'],
                             manufacturer: kv['manufacturer_name'],
-                        } as DeviceType;
+                        };
                     });
                 })
         );

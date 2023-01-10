@@ -29,8 +29,6 @@ export class CalypshomeAccessory {
     constructor(private readonly platform: CalypshomePlatform, private readonly accessory: PlatformAccessory<DeviceType>) {
         // set accessory information
         this.accessory.getService(this.platform.Service.AccessoryInformation)!.setCharacteristic(this.platform.Characteristic.Manufacturer, this.accessory.context.manufacturer);
-        // .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-        // .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
 
         this.service = this.accessory.getService(this.platform.Service.WindowCovering) || this.accessory.addService(this.platform.Service.WindowCovering);
 
