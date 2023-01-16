@@ -20,6 +20,7 @@
   "main": "dist/index.js",
   "scripts": {
     "lint": "eslint src/**.ts --max-warnings=5 --fix",
+    "clean": "rm -rf src/**.js",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
     "prepublishOnly": "npm run lint && npm run build"

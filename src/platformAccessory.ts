@@ -59,22 +59,22 @@ export class CalypshomeAccessory {
     }
 
     getPositionState() {
-        // this.platform.log.debug('Triggered getPositionState', this.accessory.context.name, this.accessory.context);
+        this.platform.log.debug('Triggered getPositionState', this.accessory.context.name, this.accessory.context);
         return this.platform.Characteristic.PositionState.STOPPED;
     }
 
     getTargetPosition() {
-        // this.platform.log.debug('Triggered GET TargetPosition');
+        this.platform.log.debug('Triggered GET TargetPosition');
         return this.getCurrentPosition();
     }
 
     setTargetPosition(value) {
         this.platform.log.debug('SET TargetPosition', this.accessory.displayName, value);
-        this.platform.calypshome.action({ id: this.accessory.context.id, gw: this.accessory.context.gw }, 'LEVEL', `level=${value}`);
+        return this.platform.calypshome.action({ id: this.accessory.context.id, gw: this.accessory.context.gw }, 'LEVEL', `level=${value}`);
     }
 
     setAngle(value) {
         this.platform.log.debug('SET setAngle', this.accessory.displayName, value);
-        this.platform.calypshome.action({ id: this.accessory.context.id, gw: this.accessory.context.gw }, 'TILT', `angle=${value}`);
+        return this.platform.calypshome.action({ id: this.accessory.context.id, gw: this.accessory.context.gw }, 'TILT', `angle=${value}`);
     }
 }

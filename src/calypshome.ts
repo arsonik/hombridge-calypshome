@@ -4,7 +4,7 @@ import { Logger } from 'homebridge';
 export class CalypsHome {
     url = 'https://ma.calypshome.com';
     private sessionId?: string;
-    lastUpdate?: number;
+    loadingDevices?: Promise<DeviceType[]>;
 
     constructor(private auth: { username: string; password: string }, public readonly log: Logger) {
         this.log.info(`Calyps'Home init with ${auth.username}/${'*'.repeat(auth.password.length)}`);
@@ -41,7 +41,11 @@ export class CalypsHome {
     }
 
     async devices(): Promise<DeviceType[]> {
-        return this.login()
+        if (this.loadingDevices) {
+            return this.loadingDevices;
+        }
+
+        return (this.loadingDevices = this.login()
             .then(() =>
                 fetch(`${this.url}/ajax`, {
                     method: 'POST',
@@ -57,9 +61,8 @@ export class CalypsHome {
                             .flat()
                             .filter((x) => x.gw !== 'System')
                     )
-                    .then((x) => {
-                        this.lastUpdate = new Date().getTime();
-                        return x.map((g) => {
+                    .then((x) =>
+                        x.map((g) => {
                             const kv = g.statuss.reduce((acc, s) => {
                                 const m = s.statusname.match(/\/([^/]+)$/);
                                 if (m) {
@@ -74,13 +77,19 @@ export class CalypsHome {
                                 name: kv['__user_name'],
                                 manufacturer: kv['manufacturer_name'],
                             };
-                        });
+                        })
+                    )
+                    .then((result) => {
+                        setTimeout(() => {
+                            this.loadingDevices = undefined;
+                        }, 5 * 60 * 1000);
+                        return result;
                     })
             )
             .catch((e) => {
                 this.log.error('Failed to get devices', e);
                 return [];
-            });
+            }));
     }
 
     action(object: { id: number; gw: string }, action: 'STOP' | 'CLOSE' | 'OPEN' | 'LEVEL' | 'TILT', args?: string) {

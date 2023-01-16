@@ -6,8 +6,7 @@ import { CalypsHome } from './calypshome';
 export class CalypshomePlatform implements DynamicPlatformPlugin {
     public readonly Service = this.api.hap.Service;
     public readonly Characteristic = this.api.hap.Characteristic;
-
-    public readonly accessories: PlatformAccessory[] = [];
+    public readonly accessories: PlatformAccessory<DeviceType>[] = [];
     calypshome: CalypsHome;
 
     constructor(public readonly log: Logger, public readonly config: PlatformConfig, public readonly api: API) {
@@ -17,11 +16,10 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         this.api.on('didFinishLaunching', () => {
             log.debug('Executed didFinishLaunching callback');
             void this.discoverDevices();
-            setInterval(() => void this.updateDevices(), 60 * 1000 * 10);
         });
     }
 
-    configureAccessory(accessory: PlatformAccessory) {
+    configureAccessory(accessory: PlatformAccessory<DeviceType>) {
         this.log.info('Loading accessory from cache:', accessory.displayName);
 
         // add the restored accessory to the accessories cache so we can track if it has already been registered
@@ -32,13 +30,12 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         return this.calypshome.devices().then((devices) => {
             devices.forEach((device) => {
                 const uuid = this.api.hap.uuid.generate(device.id.toString());
-                const existingAccessory = this.accessories.find((accessory) => accessory.UUID === uuid) as PlatformAccessory<DeviceType> | undefined;
+                const existingAccessory = this.accessories.find((accessory) => accessory.UUID === uuid);
 
                 if (existingAccessory) {
                     // the accessory already exists
                     this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
 
-                    // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
                     existingAccessory.context = device;
                     this.api.updatePlatformAccessories([existingAccessory]);
 
