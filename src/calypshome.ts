@@ -14,7 +14,7 @@ export class CalypsHome {
             return Promise.resolve(true);
         }
 
-        this.log.debug(`Session init ${this.auth.username}/${this.auth.password.replaceAll(/./g, '*')}`);
+        this.log.debug(`Session init ${this.auth.username}/${'*'.repeat(this.auth.password.length)}`);
         return fetch(`${this.url}/login`, {
             method: 'POST',
             redirect: 'manual',

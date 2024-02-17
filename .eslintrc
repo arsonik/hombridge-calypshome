@@ -1,5 +1,5 @@
 {
-  "extends": ["@ezweb/eslint-config/node"],
+  "plugins": ["@typescript-eslint/eslint-plugin"],
   "parserOptions": {
     "project": "./tsconfig.json"
   },
@@ -10,10 +10,9 @@
   },
   "overrides": [
     {
-      "files": ["*.js"],
+      "files": ["tests/**/*.ts"],
       "rules": {
-        "no-var": "off",
-        "prefer-destructuring": "off"
+        "node/no-unpublished-import": "off"
       }
     }
   ],
