@@ -14,7 +14,7 @@ export class CalypsHome {
             return Promise.resolve(true);
         }
 
-        this.log.debug('Session init');
+        this.log.debug(`Session init ${this.auth.username}/${this.auth.password.replaceAll(/./g, '*')}`);
         return fetch(`${this.url}/login`, {
             method: 'POST',
             redirect: 'manual',
@@ -45,25 +45,27 @@ export class CalypsHome {
                 },
             })
                 .then((x) => x.json())
-                .then((data) => {
-                    const x = data[0][1]['objects'] as { id: number; gw: string; statuss: { statusname: string; status: string }[] }[];
-                    return x.map((g) => {
-                        const kv = g.statuss.reduce((acc, s) => {
-                            const m = s.statusname.match(/\/([^/]+)$/);
-                            if (m) {
-                                acc[m[1]] = s.status;
-                            }
-                            return acc;
-                        }, {} as DeviceType['kv']);
-                        return {
-                            id: g.id,
-                            gw: g.gw,
-                            kv,
-                            name: kv['__user_name'],
-                            manufacturer: kv['manufacturer_name'],
-                        } as DeviceType;
-                    });
-                })
+                .then((data: ResType) =>
+                    data[0]
+                        .filter((entry) => entry.objects && entry.alias !== 'System')
+                        .flatMap((g) => g.objects ?? [])
+                        .map((g) => {
+                            const kv = g.statuss.reduce((acc, s) => {
+                                const m = s.statusname.match(/\/([^/]+)$/);
+                                if (m) {
+                                    acc[m[1]] = s.status;
+                                }
+                                return acc;
+                            }, {} as DeviceType['kv']);
+                            return {
+                                id: g.id,
+                                gw: g.gw,
+                                kv,
+                                name: kv['__user_name'],
+                                manufacturer: kv['manufacturer_name'],
+                            } as DeviceType;
+                        })
+                )
         );
     }
 
@@ -95,3 +97,16 @@ export class CalypsHome {
         );
     }
 }
+type ResType = [
+    [
+        {
+            alias: string;
+            isconnected: boolean;
+            objects?: {
+                id: number;
+                gw: string;
+                statuss: { statusname: string; status: string }[];
+            }[];
+        }
+    ]
+];
