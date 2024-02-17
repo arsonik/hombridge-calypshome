@@ -46,8 +46,8 @@ export class CalypshomeAccessory {
 
         if (this.accessory.context.kv.angle !== undefined) {
             this.service.getCharacteristic(this.platform.Characteristic.CurrentHorizontalTiltAngle).onGet(this.getAngle.bind(this));
+            this.service.getCharacteristic(this.platform.Characteristic.TargetHorizontalTiltAngle).onSet(this.setAngle.bind(this));
         }
-        this.service.getCharacteristic(this.platform.Characteristic.TargetHorizontalTiltAngle).onSet(this.setAngle.bind(this));
 
         this.service.getCharacteristic(this.platform.Characteristic.HoldPosition).onSet(this.stop.bind(this));
         this.service.getCharacteristic(this.platform.Characteristic.HoldPosition).onGet(this.isHolding.bind(this));
