@@ -1,6 +1,6 @@
 {
   "name": "homebridge-calypshome",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Homebridge plugin for Calyps'Home",
   "repository": {
     "type": "git",
@@ -26,7 +26,10 @@
     "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [
-    "homebridge-plugin", "calyps'home", "calyps'home", "profalux"
+    "homebridge-plugin",
+    "calyps'home",
+    "calyps'home",
+    "profalux"
   ],
   "devDependencies": {
     "@types/node": "^20",
