@@ -38,17 +38,16 @@ export class CalypshomeAccessory {
 
         // @see https://developers.homebridge.io/#/characteristic/TargetPosition
 
-        // create handlers for required characteristics
         this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).onGet(this.getCurrentPosition.bind(this));
+        this.service.getCharacteristic(this.platform.Characteristic.PositionState).onGet(this.getPositionState.bind(this));
+        this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).onGet(this.getTargetPosition.bind(this)).onSet(this.setTargetPosition.bind(this));
 
         if (this.accessory.context.kv.angle !== undefined) {
             this.service.getCharacteristic(this.platform.Characteristic.CurrentHorizontalTiltAngle).onGet(this.getAngle.bind(this));
         }
-
-        this.service.getCharacteristic(this.platform.Characteristic.PositionState).onGet(this.getPositionState.bind(this));
-        this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).onGet(this.getTargetPosition.bind(this)).onSet(this.setTargetPosition.bind(this));
         this.service.getCharacteristic(this.platform.Characteristic.TargetHorizontalTiltAngle).onSet(this.setAngle.bind(this));
         this.service.getCharacteristic(this.platform.Characteristic.HoldPosition).onSet(this.stop.bind(this));
+        this.service.getCharacteristic(this.platform.Characteristic.HoldPosition).onGet(this.isHolding.bind(this));
     }
 
     getAngle() {
@@ -80,5 +79,10 @@ export class CalypshomeAccessory {
     stop() {
         this.platform.log.debug('SET Stop', this.accessory.displayName);
         this.platform.calypshome.action({ id: this.accessory.context.id, gw: this.accessory.context.gw }, 'STOP');
+    }
+
+    isHolding() {
+        // not implemented
+        return false;
     }
 }
