@@ -29,6 +29,8 @@ export class CalypshomeAccessory {
     constructor(private readonly platform: CalypshomePlatform, private readonly accessory: PlatformAccessory<DeviceType>) {
         // set accessory information
         this.accessory.getService(this.platform.Service.AccessoryInformation)?.setCharacteristic(this.platform.Characteristic.Manufacturer, this.accessory.context.manufacturer);
+        this.accessory.getService(this.platform.Service.AccessoryInformation)?.setCharacteristic(this.platform.Characteristic.Model, this.accessory.context.gw);
+        this.accessory.getService(this.platform.Service.AccessoryInformation)?.setCharacteristic(this.platform.Characteristic.SerialNumber, this.accessory.context.id.toString());
         // .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
         // .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
 
@@ -46,6 +48,7 @@ export class CalypshomeAccessory {
             this.service.getCharacteristic(this.platform.Characteristic.CurrentHorizontalTiltAngle).onGet(this.getAngle.bind(this));
         }
         this.service.getCharacteristic(this.platform.Characteristic.TargetHorizontalTiltAngle).onSet(this.setAngle.bind(this));
+
         this.service.getCharacteristic(this.platform.Characteristic.HoldPosition).onSet(this.stop.bind(this));
         this.service.getCharacteristic(this.platform.Characteristic.HoldPosition).onGet(this.isHolding.bind(this));
     }
@@ -83,6 +86,6 @@ export class CalypshomeAccessory {
 
     isHolding() {
         // not implemented
-        return false;
+        return 1;
     }
 }
