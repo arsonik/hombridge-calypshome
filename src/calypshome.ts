@@ -1,12 +1,18 @@
 import { DeviceType } from './platformAccessory';
-import { Logger } from 'homebridge';
+type Logger = {
+    info(message: string, ...parameters: any[]): void;
+    warn(message: string, ...parameters: any[]): void;
+    error(message: string, ...parameters: any[]): void;
+    debug(message: string, ...parameters: any[]): void;
+    log(level: string, message: string, ...parameters: any[]): void;
+}
 
 export class CalypsHome {
     url = 'https://ma.calypshome.com';
     private sessionId?: string;
 
-    constructor(private auth: { username: string; password: string }, public readonly log: Logger) {
-        this.log.info('CalypsHome init');
+    constructor(private auth: { username: string; password: string }, public readonly logger: Logger) {
+        this.logger.info('CalypsHome init');
     }
 
     login() {
@@ -14,7 +20,7 @@ export class CalypsHome {
             return Promise.resolve(true);
         }
 
-        this.log.debug(`Session init ${this.auth.username}/${'*'.repeat(this.auth.password.length)}`);
+        this.logger.debug(`Session init ${this.auth.username}/${'*'.repeat(this.auth.password.length)}`);
         return fetch(`${this.url}/login`, {
             method: 'POST',
             redirect: 'manual',
@@ -31,7 +37,7 @@ export class CalypsHome {
             if (!response.headers.get('location')) {
                 throw new Error('Login failed');
             }
-            this.log.debug('Logged in', this.sessionId);
+            this.logger.debug('Logged in', this.sessionId);
         });
     }
 
@@ -69,14 +75,14 @@ export class CalypsHome {
         );
     }
 
-    action(object: { id: number; gw: string }, action: 'STOP' | 'CLOSE' | 'OPEN' | 'LEVEL' | 'TILT', args?: string) {
+    async action(object: { id: number; gw: string }, action: 'STOP' | 'CLOSE' | 'OPEN' | 'LEVEL' | 'TILT', args?: string): Promise<boolean> {
         const sp = new URLSearchParams({
             gw: object.gw,
             id: object.id.toString(),
             action,
             args: args ?? '',
         });
-        this.log.debug('ACTION', sp);
+        this.logger.debug('ACTION', sp);
         return this.login().then(() =>
             fetch(`${this.url}/ihm`, {
                 method: 'POST',
@@ -87,11 +93,11 @@ export class CalypsHome {
                 body: sp.toString(),
             }).then((response) => {
                 if (response.status === 401) {
-                    this.log.debug('Session expired');
+                    this.logger.debug('Session expired');
                     this.sessionId = undefined;
                     return this.action(object, action, args);
                 }
-                this.log.debug('ACTION result', response.status, response.statusText);
+                this.logger.debug('ACTION result', response.status, response.statusText);
                 return true;
             })
         );
