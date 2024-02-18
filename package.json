@@ -1,6 +1,6 @@
 {
   "name": "homebridge-calypshome",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Homebridge plugin for Calyps'Home",
   "repository": {
     "type": "git",
