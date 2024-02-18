@@ -18,8 +18,8 @@
     "homebridge": ">=1.3.5"
   },
   "exports": {
-    ".": "dist/index.js",
-    "./calypshome.js": "dist/calypshome.js"
+    ".": "./dist/index.js",
+    "./calypshome": "./dist/calypshome.js"
   },
   "scripts": {
     "lint": "eslint src/**.ts --max-warnings=5 --fix",
