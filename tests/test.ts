@@ -1,3 +1,4 @@
+// eslint-disable-next-line node/no-unpublished-import
 import { CalypsHome } from '../src/calypshome';
 import assert from 'node:assert';
 
@@ -10,7 +11,6 @@ import assert from 'node:assert';
             .devices()
             .then((devices) => {
                 console.log(devices);
-
                 return devices.find((d) => d.name === 'Office');
             })
             .then(async (device) => {

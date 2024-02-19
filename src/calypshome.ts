@@ -1,28 +1,31 @@
 import { DeviceType } from './platformAccessory';
+import assert from 'node:assert';
 type Logger = {
-    info(message: string, ...parameters: any[]): void;
-    warn(message: string, ...parameters: any[]): void;
-    error(message: string, ...parameters: any[]): void;
-    debug(message: string, ...parameters: any[]): void;
-    log(level: string, message: string, ...parameters: any[]): void;
-}
+    info(message: string, ...parameters: unknown[]): void;
+    warn(message: string, ...parameters: unknown[]): void;
+    error(message: string, ...parameters: unknown[]): void;
+    debug(message: string, ...parameters: unknown[]): void;
+    log(level: string, message: string, ...parameters: unknown[]): void;
+};
 
 export class CalypsHome {
     url = 'https://ma.calypshome.com';
     private sessionId?: string;
 
-    constructor(private auth: { username: string; password: string }, public readonly logger: Logger) {
+    constructor(
+        private auth: { username: string; password: string },
+        public readonly logger: Logger
+    ) {
         this.logger.info('CalypsHome init');
     }
 
-    login() {
+    async login(): Promise<string> {
         if (this.sessionId) {
-            return Promise.resolve(true);
+            return this.sessionId;
         }
 
         this.logger.debug(`Session init ${this.auth.username}/${'*'.repeat(this.auth.password.length)}`);
-        return fetch(`${this.url}/login`, {
-            method: 'POST',
+        return this.apiCall(`${this.url}/login`, {
             redirect: 'manual',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -32,37 +35,42 @@ export class CalypsHome {
                 _password: this.auth.password,
                 _submit: 'Sign in',
             }).toString(),
-        }).then((response) => {
-            this.sessionId = response.headers.get('set-cookie')?.match(/JSESSIONID=([^;]+)/)?.[1];
-            if (!response.headers.get('location')) {
-                throw new Error('Login failed');
-            }
-            this.logger.debug('Logged in', this.sessionId);
-        });
+        })
+            .then((response) => {
+                assert(response.status === 302, new Error('Login failed'));
+                return response.headers.get('set-cookie')?.match(/JSESSIONID=([^;]+)/)?.[1];
+            })
+            .then((sessionId) => {
+                if (!sessionId) {
+                    throw new Error('Login failed');
+                }
+                return (this.sessionId = sessionId);
+            });
     }
 
     async devices(): Promise<DeviceType[]> {
         return this.login().then(() =>
-            fetch(`${this.url}/ajax`, {
-                method: 'POST',
+            this.apiCall(`${this.url}/ajax`, {
                 headers: {
                     Accept: 'application/json',
-                    Cookie: `JSESSIONID=${this.sessionId}`,
                 },
             })
-                .then((x) => x.json())
+                .then(async (x) => x.json())
                 .then((data: ResType) =>
                     data[0]
                         .filter((entry) => entry.objects && entry.alias !== 'System')
                         .flatMap((g) => g.objects ?? [])
                         .map((g) => {
-                            const kv = g.statuss.reduce((acc, s) => {
-                                const m = s.statusname.match(/\/([^/]+)$/);
-                                if (m) {
-                                    acc[m[1]] = s.status;
-                                }
-                                return acc;
-                            }, {} as DeviceType['kv']);
+                            const kv = g.statuss.reduce(
+                                (acc, s) => {
+                                    const m = s.statusname.match(/\/([^/]+)$/);
+                                    if (m) {
+                                        acc[m[1]] = s.status;
+                                    }
+                                    return acc;
+                                },
+                                {} as DeviceType['kv']
+                            );
                             return {
                                 id: g.id,
                                 gw: g.gw,
@@ -82,27 +90,66 @@ export class CalypsHome {
             action,
             args: args ?? '',
         });
-        this.logger.debug('ACTION', sp);
+        this.logger.debug('ACTION', sp.toString());
         return this.login().then(() =>
-            fetch(`${this.url}/ihm`, {
-                method: 'POST',
+            this.apiCall(`${this.url}/ihm`, {
                 headers: {
-                    Cookie: `JSESSIONID=${this.sessionId}`,
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: sp.toString(),
             }).then((response) => {
-                if (response.status === 401) {
-                    this.logger.debug('Session expired');
-                    this.sessionId = undefined;
-                    return this.action(object, action, args);
-                }
                 this.logger.debug('ACTION result', response.status, response.statusText);
                 return true;
             })
         );
     }
+
+    private async apiCall(url: string, options: RequestInit): ReturnType<typeof fetch> {
+        const ac = new AbortController();
+        setTimeout(() => {
+            ac.abort();
+        }, 5000);
+        const isLogin = url.includes('/login');
+
+        const opts = {
+            method: 'POST',
+            ...options,
+            signal: ac.signal,
+            headers: {
+                ...options.headers,
+            },
+        };
+        if (!isLogin) {
+            opts.headers['Cookie'] = `JSESSIONID=${this.sessionId}`;
+        }
+
+        this.logger.debug(`API call ${url}`, opts);
+        return fetch(url, opts)
+            .then(async (response) => {
+                const responseheaders: Record<string, unknown>[] = [];
+                response.headers.forEach((v, k) => responseheaders.push({ [k]: v }));
+
+                this.logger.debug(`API call response ${url}`, {
+                    response: {
+                        status: response.status,
+                        statusText: response.statusText,
+                        headers: responseheaders,
+                    },
+                });
+                if (response.status === 401 && !isLogin) {
+                    this.logger.debug('Session expired');
+                    this.sessionId = undefined;
+                    return this.login().then(() => this.apiCall(url, options));
+                }
+                return response;
+            })
+            .catch((e) => {
+                this.logger.error(`API call ${url}`, e);
+                throw e;
+            });
+    }
 }
+
 type ResType = [
     [
         {
@@ -113,6 +160,6 @@ type ResType = [
                 gw: string;
                 statuss: { statusname: string; status: string }[];
             }[];
-        }
-    ]
+        },
+    ],
 ];
