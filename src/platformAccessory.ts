@@ -26,7 +26,10 @@ export type DeviceType = {
 export class CalypshomeAccessory {
     private service: Service;
 
-    constructor(private readonly platform: CalypshomePlatform, private readonly accessory: PlatformAccessory<DeviceType>) {
+    constructor(
+        private readonly platform: CalypshomePlatform,
+        private readonly accessory: PlatformAccessory<DeviceType>
+    ) {
         // set accessory information
         this.accessory.getService(this.platform.Service.AccessoryInformation)?.setCharacteristic(this.platform.Characteristic.Manufacturer, this.accessory.context.manufacturer);
         this.accessory.getService(this.platform.Service.AccessoryInformation)?.setCharacteristic(this.platform.Characteristic.Model, this.accessory.context.gw);

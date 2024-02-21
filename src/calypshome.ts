@@ -10,7 +10,7 @@ type Logger = {
 
 export class CalypsHome {
     url = 'https://ma.calypshome.com';
-    private sessionId?: string;
+    sessionId?: string;
 
     constructor(
         private auth: { username: string; password: string },
@@ -56,6 +56,10 @@ export class CalypsHome {
                 },
             })
                 .then(async (x) => x.json())
+                .catch((e) => {
+                    this.logger.error('devices() response failed at json()', e);
+                    throw e;
+                })
                 .then((data: ResType) =>
                     data[0]
                         .filter((entry) => entry.objects && entry.alias !== 'System')
@@ -108,7 +112,7 @@ export class CalypsHome {
         const ac = new AbortController();
         setTimeout(() => {
             ac.abort();
-        }, 5000);
+        }, 5 * 1000);
         const isLogin = url.includes('/login');
 
         const opts = {
