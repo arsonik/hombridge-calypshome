@@ -1,4 +1,4 @@
-import assert from 'node:assert';
+import assert from 'assert';
 import { Logging } from 'homebridge';
 
 export type DeviceType = {
@@ -126,7 +126,7 @@ export class CalypshomeAPI {
         );
     }
 
-    private async apiCall(url: string, options: RequestInit): ReturnType<typeof fetch> {
+    private async apiCall(url: string, options: RequestInit): Promise<Response> {
         const ac = new AbortController();
         setTimeout(() => {
             ac.abort();
