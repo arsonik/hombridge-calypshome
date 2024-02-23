@@ -1,4 +1,3 @@
-import assert from 'assert';
 import { Logging } from 'homebridge';
 
 export type DeviceType = {
@@ -59,7 +58,9 @@ export class CalypshomeAPI {
             }).toString(),
         })
             .then((response) => {
-                assert(response.status === 302, new Error('Login failed'));
+                if (response.status !== 302) {
+                    throw new Error('Login failed');
+                }
                 return response.headers.get('set-cookie')?.match(/JSESSIONID=([^;]+)/)?.[1];
             })
             .then((sessionId) => {
