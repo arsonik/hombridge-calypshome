@@ -1,23 +1,45 @@
-import { DeviceType } from './platformAccessory';
 import assert from 'node:assert';
-type Logger = {
-    info(message: string, ...parameters: unknown[]): void;
-    warn(message: string, ...parameters: unknown[]): void;
-    error(message: string, ...parameters: unknown[]): void;
-    debug(message: string, ...parameters: unknown[]): void;
-    log(level: string, message: string, ...parameters: unknown[]): void;
+import { Logging } from 'homebridge';
+
+export type DeviceType = {
+    id: number;
+    gw: string;
+    kv: {
+        level: string;
+        __user_name: string;
+        alert_message: string;
+        manufacturer_name: string;
+        product_name: string;
+        angle?: string;
+        present: string;
+        status: 'down' | 'up';
+    };
+    name: string;
+    manufacturer: string;
 };
 
-export class CalypsHome {
-    url = 'https://ma.calypshome.com';
-    sessionId?: string;
+type ResType = [
+    [
+        {
+            alias: string;
+            isconnected: boolean;
+            objects?: {
+                id: number;
+                gw: string;
+                statuss: { statusname: string; status: string }[];
+            }[];
+        },
+    ],
+];
+
+export class CalypshomeAPI {
+    private url = 'https://ma.calypshome.com';
+    private sessionId?: string;
 
     constructor(
         private auth: { username: string; password: string },
-        public readonly logger: Logger
-    ) {
-        this.logger.info('CalypsHome init');
-    }
+        public readonly logger: Logging
+    ) {}
 
     async login(): Promise<string> {
         if (this.sessionId) {
@@ -94,17 +116,13 @@ export class CalypsHome {
             action,
             args: args ?? '',
         });
-        this.logger.debug('ACTION', sp.toString());
         return this.login().then(() =>
             this.apiCall(`${this.url}/ihm`, {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: sp.toString(),
-            }).then((response) => {
-                this.logger.debug('ACTION result', response.status, response.statusText);
-                return true;
-            })
+            }).then((response) => response.status === 200)
         );
     }
 
@@ -132,8 +150,7 @@ export class CalypsHome {
             .then(async (response) => {
                 const responseheaders: Record<string, unknown>[] = [];
                 response.headers.forEach((v, k) => responseheaders.push({ [k]: v }));
-
-                this.logger.debug(`API call response ${url}`, {
+                this.logger.debug(`API call ${url} response`, {
                     response: {
                         status: response.status,
                         statusText: response.statusText,
@@ -153,17 +170,3 @@ export class CalypsHome {
             });
     }
 }
-
-type ResType = [
-    [
-        {
-            alias: string;
-            isconnected: boolean;
-            objects?: {
-                id: number;
-                gw: string;
-                statuss: { statusname: string; status: string }[];
-            }[];
-        },
-    ],
-];
