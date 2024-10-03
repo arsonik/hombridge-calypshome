@@ -1,7 +1,7 @@
 import { Logging } from 'homebridge';
 
 export type DeviceType = {
-    id: number;
+    id: string;
     gw: string;
     kv: {
         level: string;
@@ -11,120 +11,82 @@ export type DeviceType = {
         product_name: string;
         angle?: string;
         present: string;
-        status: 'down' | 'up';
+        status: 'down' | 'up' | 'middle';
     };
     name: string;
     manufacturer: string;
 };
 
-type ResType = [
-    [
-        {
-            alias: string;
-            isconnected: boolean;
-            objects?: {
-                id: number;
-                gw: string;
-                statuss: { statusname: string; status: string }[];
-            }[];
-        },
-    ],
-];
+type ResType = {
+    objects: {
+        id: string;
+        gw: string;
+        status: {
+            value: string;
+            name: string;
+            time: string;
+        }[];
+        categories: unknown;
+        name: string;
+        type: 'Rolling_Shutter' | {};
+        img: string;
+        eventId: string;
+        connected: boolean;
+        actions: string[];
+    }[];
+};
 
 export class CalypshomeAPI {
-    private url = 'https://ma.calypshome.com';
-    private sessionId?: string;
+    private url: string;
 
     constructor(
-        private auth: { username: string; password: string },
+        config: { url: string },
         public readonly logger: Logging
-    ) {}
-
-    async login(): Promise<string> {
-        if (this.sessionId) {
-            return this.sessionId;
-        }
-
-        this.logger.debug(`Session init ${this.auth.username}/${'*'.repeat(this.auth.password.length)}`);
-        return this.apiCall(`${this.url}/login`, {
-            redirect: 'manual',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-                _login: this.auth.username,
-                _password: this.auth.password,
-                _submit: 'Sign in',
-            }).toString(),
-        })
-            .then((response) => {
-                if (response.status !== 302) {
-                    throw new Error('Login failed');
-                }
-                return response.headers.get('set-cookie')?.match(/JSESSIONID=([^;]+)/)?.[1];
-            })
-            .then((sessionId) => {
-                if (!sessionId) {
-                    throw new Error('Login failed');
-                }
-                return (this.sessionId = sessionId);
-            });
+    ) {
+        this.url = config.url;
     }
 
     async devices(): Promise<DeviceType[]> {
-        return this.login().then(() =>
-            this.apiCall(`${this.url}/ajax`, {
-                headers: {
-                    Accept: 'application/json',
-                },
+        return this.apiCall(`${this.url}/m?a=getObjects`, {
+            headers: {
+                Accept: 'application/json',
+            },
+        })
+            .then(async (x) => x.json())
+            .catch((e) => {
+                this.logger.error('devices() response failed at json()', e);
+                throw e;
             })
-                .then(async (x) => x.json())
-                .catch((e) => {
-                    this.logger.error('devices() response failed at json()', e);
-                    throw e;
-                })
-                .then((data: ResType) =>
-                    data[0]
-                        .filter((entry) => entry.objects && entry.alias !== 'System')
-                        .flatMap((g) => g.objects ?? [])
-                        .map((g) => {
-                            const kv = g.statuss.reduce(
-                                (acc, s) => {
-                                    const m = s.statusname.match(/\/([^/]+)$/);
-                                    if (m) {
-                                        acc[m[1]] = s.status;
-                                    }
-                                    return acc;
-                                },
-                                {} as DeviceType['kv']
-                            );
-                            return {
-                                id: g.id,
-                                gw: g.gw,
-                                kv,
-                                name: kv['__user_name'],
-                                manufacturer: kv['manufacturer_name'],
-                            } as DeviceType;
-                        })
-                )
-        );
+            .then((data: ResType) => {
+                const shutters = data.objects.filter((entry) => entry.type === 'Rolling_Shutter');
+                return shutters.map((g) => {
+                    const kv = g.status.reduce(
+                        (acc, s) => {
+                            acc[s.name] = s.value;
+                            return acc;
+                        },
+                        {} as DeviceType['kv']
+                    );
+                    return {
+                        id: g.id,
+                        gw: g.gw,
+                        kv,
+                        name: g.name,
+                        manufacturer: kv.manufacturer_name,
+                    } as DeviceType;
+                });
+            });
     }
 
-    async action(object: { id: number; gw: string }, action: 'STOP' | 'CLOSE' | 'OPEN' | 'LEVEL' | 'TILT', args?: string): Promise<boolean> {
+    async action(object: { id: string }, action: 'STOP' | 'CLOSE' | 'OPEN' | 'LEVEL' | 'TILT', args?: Record<string, string>): Promise<boolean> {
         const sp = new URLSearchParams({
-            gw: object.gw,
-            id: object.id.toString(),
+            id: object.id,
             action,
-            args: args ?? '',
+            args: args ? JSON.stringify(args) : '',
         });
-        return this.login().then(() =>
-            this.apiCall(`${this.url}/ihm`, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: sp.toString(),
-            }).then((response) => response.status === 200)
-        );
+        return this.apiCall(`${this.url}/m?a=command`, {
+            body: sp,
+        }).then((response) => response.status === 200);
     }
 
     private async apiCall(url: string, options: RequestInit): Promise<Response> {
@@ -132,37 +94,22 @@ export class CalypshomeAPI {
         setTimeout(() => {
             ac.abort();
         }, 5 * 1000);
-        const isLogin = url.includes('/login');
 
         const opts = {
             method: 'POST',
             ...options,
             signal: ac.signal,
-            headers: {
-                ...options.headers,
-            },
         };
-        if (!isLogin) {
-            opts.headers['Cookie'] = `JSESSIONID=${this.sessionId}`;
-        }
 
         this.logger.debug(`API call ${url}`, opts);
         return fetch(url, opts)
-            .then(async (response) => {
+            .then((response) => {
                 const responseheaders: Record<string, unknown>[] = [];
                 response.headers.forEach((v, k) => responseheaders.push({ [k]: v }));
                 this.logger.debug(`API call ${url} response`, {
-                    response: {
-                        status: response.status,
-                        statusText: response.statusText,
-                        headers: responseheaders,
-                    },
+                    status: response.status,
+                    headers: responseheaders,
                 });
-                if (response.status === 401 && !isLogin) {
-                    this.logger.debug('Session expired');
-                    this.sessionId = undefined;
-                    return this.login().then(() => this.apiCall(url, options));
-                }
                 return response;
             })
             .catch((e) => {

@@ -14,7 +14,7 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
     ) {
         this.log.debug('Booting CalypsHome platform', this.config.name);
 
-        this.calypshome = new CalypshomeAPI(config as unknown as { username: string; password: string }, log);
+        this.calypshome = new CalypshomeAPI(config as unknown as { url: string }, log);
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         this.api.on(APIEvent.DID_FINISH_LAUNCHING, this.discoverDevices.bind(this));
     }
@@ -29,7 +29,7 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
             .then((devices) =>
                 devices.reduce(
                     (acc, device) => {
-                        const uuid = this.api.hap.uuid.generate(device.id.toString());
+                        const uuid = this.api.hap.uuid.generate(device.id);
                         let accessory = this.accessories.find((obj) => obj.UUID === uuid);
                         if (accessory) {
                             acc.update.push(accessory);
@@ -68,16 +68,16 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         wcService
             .getCharacteristic(ch.TargetPosition)
             .onGet(() => Number(ac.context.kv.level))
-            .onSet((value) => this.calypshome.action({ id: ac.context.id, gw: ac.context.gw }, 'LEVEL', `level=${value as number}`));
+            .onSet((value) => this.calypshome.action({ id: ac.context.id }, 'LEVEL', { level: (value as number).toString() }));
 
         // if accessory has tilt support
         if ('angle' in ac.context.kv) {
             wcService
                 .getCharacteristic(ch.CurrentHorizontalTiltAngle)
                 .onGet(() => Number(ac.context.kv.angle))
-                .onSet((value) => this.calypshome.action({ id: ac.context.id, gw: ac.context.gw }, 'TILT', `angle=${value as number}`));
+                .onSet((value) => this.calypshome.action({ id: ac.context.id }, 'TILT', { angle: (value as number).toString() }));
         }
 
-        wcService.getCharacteristic(ch.HoldPosition).onSet(() => this.calypshome.action({ id: ac.context.id, gw: ac.context.gw }, 'STOP'));
+        wcService.getCharacteristic(ch.HoldPosition).onSet(() => this.calypshome.action({ id: ac.context.id }, 'STOP'));
     }
 }
