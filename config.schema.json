@@ -5,13 +5,8 @@
   "schema": {
     "type": "object",
     "properties": {
-      "username": {
-        "title": "Login",
-        "type": "string",
-        "required": true
-      },
-      "password": {
-        "title": "Password",
+      "url": {
+        "title": "Box url",
         "type": "string",
         "required": true
       }

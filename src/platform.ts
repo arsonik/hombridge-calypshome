@@ -59,10 +59,9 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         const wcService = ac.getService(this.api.hap.Service.WindowCovering) ?? ac.addService(this.api.hap.Service.WindowCovering);
         const aiService = ac.getService(this.api.hap.Service.AccessoryInformation) ?? ac.addService(this.api.hap.Service.AccessoryInformation);
 
-        aiService.setCharacteristic(ch.Manufacturer, ac.context.manufacturer).setCharacteristic(ch.Model, ac.context.gw).setCharacteristic(ch.SerialNumber, ac.context.id.toString());
+        aiService.setCharacteristic(ch.Manufacturer, ac.context.manufacturer).setCharacteristic(ch.Model, 'Shutter').setCharacteristic(ch.SerialNumber, ac.context.gw);
 
         wcService.setCharacteristic(ch.Name, ac.context.name);
-
         wcService.getCharacteristic(ch.CurrentPosition).onGet(() => Number(ac.context.kv.level));
         wcService.getCharacteristic(ch.PositionState).onGet(() => ch.PositionState.STOPPED);
         wcService
@@ -75,7 +74,9 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
             wcService
                 .getCharacteristic(ch.CurrentHorizontalTiltAngle)
                 .onGet(() => Number(ac.context.kv.angle))
-                .onSet((value) => this.calypshome.action({ id: ac.context.id }, 'TILT', { angle: (value as number).toString() }));
+                .onSet((value) => {
+                    this.calypshome.action({ id: ac.context.id }, 'TILT', { angle: (value as number).toString() });
+                });
         }
 
         wcService.getCharacteristic(ch.HoldPosition).onSet(() => this.calypshome.action({ id: ac.context.id }, 'STOP'));
