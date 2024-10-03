@@ -74,8 +74,8 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
             wcService
                 .getCharacteristic(ch.CurrentHorizontalTiltAngle)
                 .onGet(() => Number(ac.context.kv.angle))
-                .onSet((value) => {
-                    this.calypshome.action({ id: ac.context.id }, 'TILT', { angle: (value as number).toString() });
+                .onSet(async (value) => {
+                    await this.calypshome.action({ id: ac.context.id }, 'TILT', { angle: (value as number).toString() });
                 });
         }
 
