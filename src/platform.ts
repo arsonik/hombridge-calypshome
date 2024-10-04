@@ -4,13 +4,13 @@ import { CalypshomeAPI, DeviceType } from './calypshomeAPI';
 
 export class CalypshomePlatform implements DynamicPlatformPlugin {
     // this is used to track restored cached accessories
-    public readonly accessories: PlatformAccessory<DeviceType>[] = [];
-    public readonly calypshome: CalypshomeAPI;
+    protected readonly accessories: PlatformAccessory<DeviceType>[] = [];
+    private readonly calypshome: CalypshomeAPI;
 
     constructor(
-        public readonly log: Logging,
-        public readonly config: PlatformConfig,
-        public readonly api: API
+        protected readonly log: Logging,
+        readonly config: PlatformConfig,
+        readonly api: API
     ) {
         this.log.info('Booting CalypsHome platform');
 
@@ -19,8 +19,8 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         this.api.on(APIEvent.DID_FINISH_LAUNCHING, this.discoverDevices.bind(this));
     }
 
-    configureAccessory(accessory: PlatformAccessory<DeviceType>) {
-        this.accessories.push(accessory);
+    configureAccessory(accessory: PlatformAccessory) {
+        this.accessories.push(accessory as PlatformAccessory<DeviceType>);
     }
 
     private async discoverDevices() {
