@@ -122,16 +122,16 @@ export class CalypshomeAPI {
 
     private apiCall(url: string, options: NonNullable<Parameters<typeof request>[1]>): Promise<ResponseData> {
         const ac = new AbortController();
-        setTimeout(() => {
-            ac.abort();
-        }, 5 * 1000);
-
         options.method ??= 'POST';
         options.signal = ac.signal;
 
         this.logger.debug(`API call ${url}`, options);
+        const timer = setTimeout(() => {
+            ac.abort();
+        }, 5 * 1000);
         return request(url, options)
             .then((response) => {
+                clearTimeout(timer);
                 this.logger.debug(`API call ${url} response`, {
                     status: response.statusCode,
                 });

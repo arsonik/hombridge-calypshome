@@ -12,7 +12,7 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         public readonly config: PlatformConfig,
         public readonly api: API
     ) {
-        this.log.info('Booting CalypsHome platform', this.config.name);
+        this.log.info('Booting CalypsHome platform');
 
         this.calypshome = new CalypshomeAPI(config as unknown as { url: string }, log);
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
