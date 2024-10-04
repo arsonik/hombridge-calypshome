@@ -23,18 +23,6 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         this.accessories.push(accessory);
     }
 
-    private updateAccessories() {
-        this.calypshome.devices().then((devices) => {
-            devices.forEach((device) => {
-                const uuid = this.api.hap.uuid.generate(device.id);
-                const accessory = this.accessories.find((acc) => acc.UUID === uuid);
-                if (accessory) {
-                    //
-                }
-            });
-        });
-    }
-
     private async discoverDevices() {
         return this.calypshome
             .devices()
