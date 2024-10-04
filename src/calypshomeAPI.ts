@@ -1,20 +1,29 @@
 import { Logging } from 'homebridge';
+import { request } from 'undici';
+import Dispatcher from 'undici/types/dispatcher';
+import ResponseData = Dispatcher.ResponseData;
+
+function sleep(ms: number) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
 
 export type DeviceType = {
     id: string;
     gw: string;
     kv: {
-        level: string;
+        level: number;
         __user_name: string;
         alert_message: string;
         manufacturer_name: string;
         product_name: string;
-        angle?: string;
+        angle?: number;
         present: string;
         status: 'down' | 'up' | 'middle';
     };
+    actions: ('OPEN' | 'CLOSE' | 'STOP' | 'LEVEL' | 'TILT')[];
     name: string;
-    manufacturer: string;
 };
 
 type ResType = {
@@ -32,12 +41,15 @@ type ResType = {
         img: string;
         eventId: string;
         connected: boolean;
-        actions: string[];
+        actions: DeviceType['actions'];
     }[];
 };
 
 export class CalypshomeAPI {
     private url: string;
+    private inMemoryDevices: Record<DeviceType['id'], DeviceType> = {};
+    private timer: NodeJS.Timeout | null = null;
+    private updateInterval = 5 * 60 * 1000;
 
     constructor(
         config: { url: string },
@@ -52,63 +64,75 @@ export class CalypshomeAPI {
                 Accept: 'application/json',
             },
         })
-            .then(async (x) => x.json())
-            .catch((e) => {
-                this.logger.error('devices() response failed at json()', e);
-                throw e;
-            })
-            .then((data: ResType) => {
-                const shutters = data.objects.filter((entry) => entry.type === 'Rolling_Shutter');
-                return shutters.map((g) => {
-                    const kv = g.status.reduce(
-                        (acc, s) => {
-                            acc[s.name] = s.value;
-                            return acc;
-                        },
-                        {} as DeviceType['kv']
-                    );
-                    return {
-                        id: g.id,
-                        gw: g.gw,
-                        kv,
-                        name: g.name,
-                        manufacturer: kv.manufacturer_name,
-                    } as DeviceType;
-                });
+            .then(async (x) => x.body.json() as Promise<ResType>)
+            .then((data) =>
+                data.objects
+                    .filter((entry) => entry.type === 'Rolling_Shutter')
+                    .map((g) => {
+                        const kv = g.status.reduce(
+                            (acc, s) => {
+                                acc[s.name] = ['angle', 'level'].includes(s.name) ? Number(s.value) : s.value;
+                                return acc;
+                            },
+                            {} as DeviceType['kv']
+                        );
+                        return {
+                            id: g.id,
+                            gw: g.gw,
+                            kv,
+                            name: g.name,
+                            actions: g.actions,
+                            all: g,
+                        } as DeviceType;
+                    })
+            )
+            .then((devices) => {
+                this.inMemoryDevices = devices.reduce((acc, device) => {
+                    acc[device.id] = device;
+                    return acc;
+                }, {});
+
+                // eslint-disable-next-line no-unused-expressions
+                this.timer && clearTimeout(this.timer);
+
+                this.timer = setTimeout(() => {
+                    this.devices().catch((e) => {
+                        this.logger.error('Update error', e);
+                    });
+                }, this.updateInterval);
+                return devices;
             });
     }
 
-    async action(object: { id: string }, action: 'STOP' | 'CLOSE' | 'OPEN' | 'LEVEL' | 'TILT', args?: Record<string, string>): Promise<boolean> {
-        const sp = new URLSearchParams({
-            id: object.id,
-            action,
-            args: args ? JSON.stringify(args) : '',
-        });
+    async action(id: string, action: 'STOP' | 'CLOSE' | 'OPEN' | 'LEVEL' | 'TILT', args?: Record<string, string>): Promise<boolean> {
         return this.apiCall(`${this.url}/m?a=command`, {
-            body: sp,
-        }).then((response) => response.status === 200);
+            body: new URLSearchParams({
+                id,
+                action,
+                args: args ? JSON.stringify(args) : '',
+            }).toString(),
+        })
+            .then((response) => response.statusCode === 200)
+            .catch((e) => {
+                this.logger.error('Error in action', { id, action, args, e });
+                return false;
+            });
     }
 
-    private async apiCall(url: string, options: RequestInit): Promise<Response> {
+    private apiCall(url: string, options: NonNullable<Parameters<typeof request>[1]>): Promise<ResponseData> {
         const ac = new AbortController();
         setTimeout(() => {
             ac.abort();
         }, 5 * 1000);
 
-        const opts = {
-            method: 'POST',
-            ...options,
-            signal: ac.signal,
-        };
+        options.method ??= 'POST';
+        options.signal = ac.signal;
 
-        this.logger.debug(`API call ${url}`, opts);
-        return fetch(url, opts)
+        this.logger.debug(`API call ${url}`, options);
+        return request(url, options)
             .then((response) => {
-                const responseheaders: Record<string, unknown>[] = [];
-                response.headers.forEach((v, k) => responseheaders.push({ [k]: v }));
                 this.logger.debug(`API call ${url} response`, {
-                    status: response.status,
-                    headers: responseheaders,
+                    status: response.statusCode,
                 });
                 return response;
             })
@@ -116,5 +140,9 @@ export class CalypshomeAPI {
                 this.logger.error(`API call ${url}`, e);
                 throw e;
             });
+    }
+
+    device(id: string): DeviceType | undefined {
+        return this.inMemoryDevices[id];
     }
 }

@@ -1,4 +1,4 @@
-import { API, APIEvent, Categories, Characteristic, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
+import { API, APIEvent, Categories, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { CalypshomeAPI, DeviceType } from './calypshomeAPI';
 
@@ -12,7 +12,7 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         public readonly config: PlatformConfig,
         public readonly api: API
     ) {
-        this.log.debug('Booting CalypsHome platform', this.config.name);
+        this.log.info('Booting CalypsHome platform', this.config.name);
 
         this.calypshome = new CalypshomeAPI(config as unknown as { url: string }, log);
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -23,13 +23,31 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         this.accessories.push(accessory);
     }
 
+    private updateAccessories() {
+        this.calypshome.devices().then((devices) => {
+            devices.forEach((device) => {
+                const uuid = this.api.hap.uuid.generate(device.id);
+                const accessory = this.accessories.find((acc) => acc.UUID === uuid);
+                if (accessory) {
+                    //
+                }
+            });
+        });
+    }
+
     private async discoverDevices() {
         return this.calypshome
             .devices()
-            .then((devices) =>
-                devices.reduce(
+            .then((devices) => {
+                if (!devices.length) {
+                    return { add: [], update: [], remove: [] };
+                }
+                const remove = this.accessories.filter((acc) => !devices.some((device) => this.api.hap.uuid.generate(device.id) === acc.UUID));
+
+                return devices.reduce(
                     (acc, device) => {
                         const uuid = this.api.hap.uuid.generate(device.id);
+
                         let accessory = this.accessories.find((obj) => obj.UUID === uuid);
                         if (accessory) {
                             acc.update.push(accessory);
@@ -38,47 +56,61 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
                             acc.add.push(accessory);
                         }
                         accessory.context = device;
-                        this.hookupAccessory({ accessory, characteristic: this.api.hap.Characteristic });
+                        this.hookupAccessory(accessory);
                         return acc;
                     },
-                    { add: [], update: [] } as Record<'add' | 'update', PlatformAccessory<DeviceType>[]>
-                )
-            )
-            .then(({ add, update }) => {
+                    { add: [], update: [], remove } as Record<'add' | 'update' | 'remove', PlatformAccessory<DeviceType>[]>
+                );
+            })
+            .then(({ add, update, remove }) => {
                 if (add.length) {
                     this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, add);
                 }
                 if (update.length) {
                     this.api.updatePlatformAccessories(update);
                 }
+                if (remove.length) {
+                    this.log.warn('Removing accessories', remove.map((a) => a.displayName).join(', '));
+                    this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, remove);
+                }
             });
     }
 
-    private hookupAccessory({ accessory: ac, characteristic: ch }: { accessory: PlatformAccessory<DeviceType>; characteristic: typeof Characteristic }) {
+    private hookupAccessory(accessory: PlatformAccessory<DeviceType>) {
+        const characteristics = this.api.hap.Characteristic;
         // https://developers.homebridge.io/#/service/WindowCovering
-        const wcService = ac.getService(this.api.hap.Service.WindowCovering) ?? ac.addService(this.api.hap.Service.WindowCovering);
-        const aiService = ac.getService(this.api.hap.Service.AccessoryInformation) ?? ac.addService(this.api.hap.Service.AccessoryInformation);
+        const wcService = accessory.getService(this.api.hap.Service.WindowCovering) ?? accessory.addService(this.api.hap.Service.WindowCovering);
+        const aiService = accessory.getService(this.api.hap.Service.AccessoryInformation) ?? accessory.addService(this.api.hap.Service.AccessoryInformation);
+        const { id } = accessory.context;
 
-        aiService.setCharacteristic(ch.Manufacturer, ac.context.manufacturer).setCharacteristic(ch.Model, 'Shutter').setCharacteristic(ch.SerialNumber, ac.context.gw);
+        aiService
+            .setCharacteristic(characteristics.Manufacturer, accessory.context.kv.manufacturer_name)
+            .setCharacteristic(characteristics.Model, accessory.context.actions.includes('TILT') ? 'BSO' : 'Shutter')
+            .setCharacteristic(characteristics.SerialNumber, accessory.context.gw);
 
-        wcService.setCharacteristic(ch.Name, ac.context.name);
-        wcService.getCharacteristic(ch.CurrentPosition).onGet(() => Number(ac.context.kv.level));
-        wcService.getCharacteristic(ch.PositionState).onGet(() => ch.PositionState.STOPPED);
+        wcService.setCharacteristic(characteristics.Name, accessory.context.name);
+        wcService.getCharacteristic(characteristics.CurrentPosition).onGet(() => this.calypshome.device(id)?.kv.level ?? 0);
+        wcService.getCharacteristic(characteristics.PositionState).onGet(() => characteristics.PositionState.STOPPED);
         wcService
-            .getCharacteristic(ch.TargetPosition)
-            .onGet(() => Number(ac.context.kv.level))
-            .onSet((value) => this.calypshome.action({ id: ac.context.id }, 'LEVEL', { level: (value as number).toString() }));
+            .getCharacteristic(characteristics.TargetPosition)
+            .onGet(() => this.calypshome.device(id)?.kv.level ?? 0)
+            .onSet((value) => {
+                void this.calypshome.action(id, 'LEVEL', { level: (value as number).toString() });
+            });
 
         // if accessory has tilt support
-        if ('angle' in ac.context.kv) {
+        if (accessory.context.actions.includes('TILT')) {
+            wcService.getCharacteristic(characteristics.CurrentHorizontalTiltAngle).onGet(() => this.calypshome.device(id)?.kv.angle ?? 0);
             wcService
-                .getCharacteristic(ch.CurrentHorizontalTiltAngle)
-                .onGet(() => Number(ac.context.kv.angle))
-                .onSet(async (value) => {
-                    await this.calypshome.action({ id: ac.context.id }, 'TILT', { angle: (value as number).toString() });
+                .getCharacteristic(characteristics.TargetHorizontalTiltAngle)
+                .onGet(() => this.calypshome.device(id)?.kv.angle ?? 0)
+                .onSet((value) => {
+                    void this.calypshome.action(id, 'TILT', { angle: (value as number).toString() });
                 });
         }
 
-        wcService.getCharacteristic(ch.HoldPosition).onSet(() => this.calypshome.action({ id: ac.context.id }, 'STOP'));
+        wcService.getCharacteristic(characteristics.HoldPosition).onSet(() => {
+            void this.calypshome.action(id, 'STOP');
+        });
     }
 }
