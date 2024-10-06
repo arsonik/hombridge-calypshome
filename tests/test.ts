@@ -12,12 +12,12 @@ import assert from 'node:assert';
                 assert(device, new Error('Device not found'));
                 console.log('Device:', device);
                 // await calypshome.action({ id: device.id }, 'CLOSE');
-                await calypshome.action({ id: device.id }, 'CLOSE');
+                await calypshome.action(device.id, 'CLOSE');
                 // await calypshome.action({ id: device.id, gw: device.gw }, 'LEVEL', 'level=50');
                 // await new Promise((resolve) => {
                 //     setTimeout(resolve, 2000);
                 // });
-                return calypshome.action({ id: device.id }, 'STOP');
+                return calypshome.action(device.id, 'STOP');
             })
     // eslint-disable-next-line no-process-exit
     process.exit(0);

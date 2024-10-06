@@ -1,7 +1,5 @@
 import { Logging } from 'homebridge';
-import { request } from 'undici';
-import Dispatcher from 'undici/types/dispatcher';
-import ResponseData = Dispatcher.ResponseData;
+import { request, Agent } from 'undici';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function sleep(ms: number) {
@@ -65,7 +63,7 @@ export class CalypshomeAPI {
                 Accept: 'application/json',
             },
         })
-            .then(async (x) => x.body.json() as Promise<ResType>)
+            .then((x) => x.body.json() as Promise<ResType>)
             .then((data) =>
                 data.objects
                     .filter((entry) => entry.type === 'Rolling_Shutter')
@@ -120,10 +118,14 @@ export class CalypshomeAPI {
             });
     }
 
-    private apiCall(url: string, options: NonNullable<Parameters<typeof request>[1]>): Promise<ResponseData> {
+    private apiCall(url: string, options: NonNullable<Parameters<typeof request>[1]>) {
         const ac = new AbortController();
         options.method ??= 'POST';
         options.signal = ac.signal;
+        options.dispatcher = new Agent({
+            keepAliveTimeout: 10,
+            keepAliveMaxTimeout: 10,
+        });
 
         this.logger.debug(`API call ${url}`, options);
         const timer = setTimeout(() => {

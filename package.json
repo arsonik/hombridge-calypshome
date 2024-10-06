@@ -19,7 +19,7 @@
   },
   "exports": {
     ".": "./dist/index.js",
-    "./calypshome": "./dist/calypshome.js"
+    "./calypshome": "./dist/calypshomeAPI.js"
   },
   "scripts": {
     "lint": "eslint src/**.ts --max-warnings=5 --fix",
