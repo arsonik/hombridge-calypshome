@@ -57,6 +57,10 @@ export class CalypshomeAPI {
         this.url = config.url;
     }
 
+    get memory() {
+        return this.inMemoryDevices;
+    }
+
     async devices(): Promise<DeviceType[]> {
         return this.apiCall(`${this.url}/m?a=getObjects`, {
             headers: {

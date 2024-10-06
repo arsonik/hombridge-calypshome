@@ -26,7 +26,7 @@
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc src/index.ts --outDir dist --declaration --allowJs",
     "test": "node -r ts-node/register --env-file=.env  tests/test.ts",
-    "prepublishOnly": "npm version patch && npm run lint && npm run build"
+    "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [
     "homebridge-plugin",
