@@ -1,108 +1,84 @@
 import { Logging } from 'homebridge';
-import { request, Agent } from 'undici';
+import { EventEmitter } from 'events';
+import { Agent, request } from 'undici';
+import { z } from 'zod';
+import { RollingShutter } from './rollingShutter';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function sleep(ms: number) {
-    return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
+export const getObjectsSchema = z.object({
+    objects: z.array(
+        z.object({
+            room: z.object({
+                id: z.number(),
+                name: z.string(),
+            }),
+            id: z.string(),
+            status: z.array(
+                z.object({
+                    value: z.string(),
+                    name: z.string(),
+                    time: z.string(),
+                })
+            ),
+            categories: z.unknown(),
+            name: z.string(),
+            type: z.enum(['Rolling_Shutter', 'Composite', 'EZSP']),
+            img: z.string(),
+            gw: z.string(),
+            eventId: z.string(),
+            connected: z.boolean(),
+            actions: z.array(z.enum(['OPEN', 'CLOSE', 'STOP', 'LEVEL', 'TILT', 'SCAN', 'JOIN'])),
+        })
+    ),
+});
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export declare interface CalypshomeAPI {
+    on(event: typeof CalypshomeAPI.DEVICE_UPDATE, listener: (device: RollingShutter, type: 'angle' | 'level' | 'status') => void): this;
 }
 
-export type DeviceType = {
-    id: string;
-    gw: string;
-    kv: {
-        level: number;
-        __user_name: string;
-        alert_message: string;
-        manufacturer_name: string;
-        product_name: string;
-        angle?: number;
-        present: string;
-        status: 'down' | 'up' | 'middle';
-    };
-    actions: ('OPEN' | 'CLOSE' | 'STOP' | 'LEVEL' | 'TILT')[];
-    name: string;
-};
-
-type ResType = {
-    objects: {
-        id: string;
-        gw: string;
-        status: {
-            value: string;
-            name: string;
-            time: string;
-        }[];
-        categories: unknown;
-        name: string;
-        type: 'Rolling_Shutter' | {};
-        img: string;
-        eventId: string;
-        connected: boolean;
-        actions: DeviceType['actions'];
-    }[];
-};
-
-export class CalypshomeAPI {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class CalypshomeAPI extends EventEmitter {
     private url: string;
-    private inMemoryDevices: Record<DeviceType['id'], DeviceType> = {};
-    private timer: NodeJS.Timeout | null = null;
-    private updateInterval = 5 * 60 * 1000;
+    private wsUrl: string;
+    private inMemoryDevices: Record<RollingShutter['id'], RollingShutter> = {};
+    private declare ws: WebSocket;
+
+    static DEVICE_UPDATE = 'device_update';
 
     constructor(
         config: { url: string },
         public readonly logger: Logging
     ) {
+        super();
         this.url = config.url;
+        this.wsUrl = `${config.url.replace('http', 'ws')}/ws`;
     }
 
-    get memory() {
-        return this.inMemoryDevices;
+    close() {
+        this.ws?.close();
     }
 
-    async devices(): Promise<DeviceType[]> {
+    async devices(): Promise<RollingShutter[]> {
         return this.apiCall(`${this.url}/m?a=getObjects`, {
             headers: {
                 Accept: 'application/json',
             },
         })
-            .then((x) => x.body.json() as Promise<ResType>)
+            .then((x) => x.body.json())
             .then((data) =>
-                data.objects
-                    .filter((entry) => entry.type === 'Rolling_Shutter')
-                    .map((g) => {
-                        const kv = g.status.reduce(
-                            (acc, s) => {
-                                acc[s.name] = ['angle', 'level'].includes(s.name) ? Number(s.value) : s.value;
-                                return acc;
-                            },
-                            {} as DeviceType['kv']
-                        );
-                        return {
-                            id: g.id,
-                            gw: g.gw,
-                            kv,
-                            name: g.name,
-                            actions: g.actions,
-                            all: g,
-                        } as DeviceType;
-                    })
+                getObjectsSchema
+                    .parse(data)
+                    .objects.filter((entry) => entry.type === 'Rolling_Shutter')
+                    .map((g) => new RollingShutter(g))
             )
             .then((devices) => {
-                this.inMemoryDevices = devices.reduce((acc, device) => {
-                    acc[device.id] = device;
-                    return acc;
-                }, {});
-
-                // eslint-disable-next-line no-unused-expressions
-                this.timer && clearTimeout(this.timer);
-
-                this.timer = setTimeout(() => {
-                    this.devices().catch((e) => {
-                        this.logger.error('Update error', e);
-                    });
-                }, this.updateInterval);
+                this.inMemoryDevices = devices.reduce(
+                    (acc, device) => {
+                        acc[device.id] = device;
+                        return acc;
+                    },
+                    {} as Record<RollingShutter['id'], RollingShutter>
+                );
                 return devices;
             });
     }
@@ -149,7 +125,70 @@ export class CalypshomeAPI {
             });
     }
 
-    device(id: string): DeviceType | undefined {
+    device(id: string): RollingShutter | undefined {
         return this.inMemoryDevices[id];
+    }
+
+    connectWebSocket() {
+        this.logger.info('Connecting WebSocket');
+        // const START_TIMESTAMP = Math.round(new Date().getTime() / 1000);
+        this.ws = new WebSocket(this.wsUrl, 'lws-mirror-protocol');
+        this.ws.onopen = (event) => {
+            this.logger.info('WebSocket connected', event);
+            this.ws.send('p1 1 _web / login');
+        };
+        this.ws.onclose = (event) => {
+            this.logger.warn('WebSocket onclose() retrying in 30s', event);
+            setTimeout(() => {
+                this.connectWebSocket();
+            }, 30000);
+        };
+        this.ws.onerror = (event) => {
+            this.logger.error('WebSocket error', event);
+        };
+        this.ws.onmessage = (event) => {
+            this.handleWebSocketMessage(event);
+        };
+    }
+
+    private handleWebSocketMessage(event: MessageEvent) {
+        const [, , src, dest, cmd, rest, b64, value] = event.data.split(' ');
+        // decode base64
+        const message = b64.startsWith('@') ? Buffer.from(b64.substring(1), 'base64').toString() : b64;
+        const sysmatch = message.match(/^event\/system\/gateway\/dev-\d\/id-self\/(.*)/);
+
+        if (message === 'event/ui/web/connect') {
+            return;
+        }
+        if (sysmatch) {
+            if (['uptime', 'cpu_idle', 'disk_free', 'memory_free', 'load_5', 'system_uptime'].includes(sysmatch[1]) || sysmatch[1].startsWith('gw_')) {
+                return;
+            }
+            this.logger.info('WebSocket system message', event.data, { match: sysmatch[1], value });
+            return;
+        }
+        const devmatch = message.match(/^event\/io\/ezsp\/dev-\d\/([^/]+)\/(level|angle|status)/);
+        if (devmatch) {
+            const [, device, type] = devmatch;
+            const matchedDevice = Object.values(this.inMemoryDevices).find((d) => d.id.includes(device));
+            if (matchedDevice) {
+                this.update(matchedDevice, type, value);
+                return;
+            }
+            this.logger.warn('WebSocket dev message', event.data, { device, type });
+
+            return;
+        }
+        this.logger.warn('WebSocket unknown message', event.data, { src, dest, cmd, rest, message, value });
+    }
+
+    update(device: RollingShutter, key: 'angle' | 'level' | 'status', value: string) {
+        if (key === 'angle') {
+            device.angle = Number(value);
+        } else if (key === 'level') {
+            device.level = Number(value);
+        }
+
+        this.emit(CalypshomeAPI.DEVICE_UPDATE, device, key);
     }
 }

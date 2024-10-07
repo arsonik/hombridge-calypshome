@@ -24,7 +24,7 @@
   "scripts": {
     "lint": "eslint src/**.ts --max-warnings=5 --fix",
     "watch": "npm run build && npm link && nodemon",
-    "build": "rimraf ./dist && tsc src/index.ts --outDir dist --declaration --allowJs",
+    "build": "rimraf ./dist && tsc",
     "test": "node -r ts-node/register --env-file=.env  tests/test.ts",
     "prepublishOnly": "npm run lint && npm run build"
   },
@@ -54,6 +54,8 @@
     "typescript": "5.6.2"
   },
   "dependencies": {
-    "undici": "^6.19.8"
-  }
+    "undici": "^6.19.8",
+    "zod": "^3.23.8"
+  },
+  "packageManager": "pmpm@9.12.0"
 }
