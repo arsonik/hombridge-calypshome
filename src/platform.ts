@@ -52,16 +52,14 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         return this.calypshome
             .devices()
             .then((devices) => {
+                this.calypshome.connectWebSocket();
                 if (!devices.length) {
                     return { add: [], update: [], remove: [] };
                 }
-                this.calypshome.connectWebSocket();
                 const remove = this.accessories.filter((acc) => !devices.some((device) => this.api.hap.uuid.generate(device.id) === acc.UUID));
-
-                this.log.info(
-                    'Devices:',
-                    devices.map((d) => d.id)
-                );
+                devices.forEach((d) => {
+                    this.log.info(`${d.serialNumber} - ${d.name}`);
+                });
 
                 return devices.reduce(
                     (acc, device) => {

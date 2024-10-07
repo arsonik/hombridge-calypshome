@@ -22,6 +22,6 @@ export class RollingShutter {
         const level = data.status.find((s) => s.name === 'level')?.value;
         this.level = typeof level === 'string' ? Number(level) : undefined;
         this.manufacturerName = data.status?.find((c) => c.name === 'manufacturer_name')?.value ?? 'n/a';
-        this.serialNumber = this.id.replace(/^.*IEEEAddr-(.*):.*$/, '$1');
+        this.serialNumber = this.id.replace(/^.*IEEEAddr-([^:]+):.*$/, '$1');
     }
 }

@@ -9,6 +9,7 @@ import { getObjectsResponseSchema } from './api/getObjectsResponseSchema'; // ca
 export class CalypshomeAPI extends EventEmitter {
     private inMemoryDevices: Record<RollingShutter['id'], RollingShutter> = {};
     private ws: WebSocket | undefined = undefined;
+    private closing = false;
 
     static DEVICE_UPDATE = 'device_update';
 
@@ -100,10 +101,12 @@ export class CalypshomeAPI extends EventEmitter {
             ws?.send('p1 1 _web / login');
         });
         ws.on('close', () => {
-            this.logger.warn('WebSocket onclose() retrying in 30s');
-            setTimeout(() => {
-                this.connectWebSocket();
-            }, 30000);
+            this.logger.warn('WebSocket onclose()');
+            if (!this.closing) {
+                setTimeout(() => {
+                    this.connectWebSocket();
+                }, 30000);
+            }
         });
         ws.on('error', (event) => {
             this.logger.error('WebSocket error', event);
@@ -155,6 +158,8 @@ export class CalypshomeAPI extends EventEmitter {
     }
 
     close() {
+        this.logger.warn('Closing WebSocket...');
+        this.closing = true;
         this.ws?.close();
     }
 }
