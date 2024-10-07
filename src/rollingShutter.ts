@@ -14,7 +14,7 @@ export class RollingShutter {
         this.id = data.id;
         this.name = data.name;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        this.actions = data.actions.filter((a) => a !== 'SCAN') as any;
+        this.actions = data.actions.filter((a) => a !== 'SCAN');
 
         const angle = data.status.find((s) => s.name === 'angle')?.value;
         this.angle = typeof angle === 'string' ? Number(angle) : undefined;

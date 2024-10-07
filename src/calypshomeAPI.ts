@@ -147,11 +147,11 @@ export class CalypshomeAPI extends EventEmitter {
             this.logger.error('WebSocket error', event);
         };
         this.ws.onmessage = (event) => {
-            this.handleWebSocketMessage(event);
+            this.handleWebSocketMessage(event as MessageEvent<string>);
         };
     }
 
-    private handleWebSocketMessage(event: MessageEvent) {
+    private handleWebSocketMessage(event: MessageEvent<string>) {
         const [, , src, dest, cmd, rest, b64, value] = event.data.split(' ');
         // decode base64
         const message = b64.startsWith('@') ? Buffer.from(b64.substring(1), 'base64').toString() : b64;
@@ -171,8 +171,8 @@ export class CalypshomeAPI extends EventEmitter {
         if (devmatch) {
             const [, device, type] = devmatch;
             const matchedDevice = Object.values(this.inMemoryDevices).find((d) => d.id.includes(device));
-            if (matchedDevice) {
-                this.update(matchedDevice, type, value);
+            if (matchedDevice && ['level', 'angle', 'status'].includes(type)) {
+                this.update(matchedDevice, type as 'level' | 'angle' | 'status', value);
                 return;
             }
             this.logger.warn('WebSocket dev message', event.data, { device, type });

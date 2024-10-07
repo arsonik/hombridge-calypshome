@@ -46,7 +46,7 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
                 // accessory.getCharacteristic(this.api.hap.Characteristic.PositionState).updateValue(this.api.hap.Characteristic.PositionState.STOPPED);
                 break;
             default:
-                console.log('Unknown type:', type);
+                this.log.warn('Unknown type:', type);
         }
     }
 
@@ -60,7 +60,7 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
                 this.calypshome.connectWebSocket();
                 const remove = this.accessories.filter((acc) => !devices.some((device) => this.api.hap.uuid.generate(device.id) === acc.UUID));
 
-                console.log(
+                this.log.info(
                     'Devices:',
                     devices.map((d) => d.id)
                 );
