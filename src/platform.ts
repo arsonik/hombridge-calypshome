@@ -35,12 +35,15 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
 
         switch (type) {
             case 'level':
+                this.log.debug('Updating level', device.name, device.level);
                 accessory.getCharacteristic(this.api.hap.Characteristic.CurrentPosition).updateValue(device.level!);
                 break;
             case 'angle':
+                this.log.debug('Updating angle', device.name, device.angle);
                 accessory.getCharacteristic(this.api.hap.Characteristic.CurrentHorizontalTiltAngle).updateValue(device.angle!);
                 break;
             case 'status':
+                this.log.debug('Updating status', device.name, device.level);
                 // accessory.getCharacteristic(this.api.hap.Characteristic.PositionState).updateValue(this.api.hap.Characteristic.PositionState.STOPPED);
                 break;
             default:

@@ -91,6 +91,10 @@ export class CalypshomeAPI extends EventEmitter {
         return this.inMemoryDevices[id];
     }
 
+    deviceByName(name: string): RollingShutter | undefined {
+        return Object.values(this.inMemoryDevices).find((d) => d.name === name);
+    }
+
     connectWebSocket() {
         this.logger.info('Connecting WebSocket');
         // const START_TIMESTAMP = Math.round(new Date().getTime() / 1000);
