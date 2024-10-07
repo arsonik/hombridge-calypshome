@@ -37,6 +37,7 @@
   "devDependencies": {
     "@types/node": "20.16.10",
     "@types/prettier": "3.0.0",
+    "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "7.0.1",
     "@typescript-eslint/parser": "7.0.1",
     "eslint": "8.56.0",
@@ -55,6 +56,7 @@
   },
   "dependencies": {
     "undici": "^6.19.8",
+    "ws": "^8.18.0",
     "zod": "^3.23.8"
   },
   "packageManager": "pmpm@9.12.0"

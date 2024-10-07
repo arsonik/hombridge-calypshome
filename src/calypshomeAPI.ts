@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { Agent, request } from 'undici';
 import { z } from 'zod';
 import { RollingShutter } from './rollingShutter';
+import WebSocket from 'ws'; // can be replaced with native node later
 
 export const getObjectsSchema = z.object({
     objects: z.array(
@@ -133,26 +134,26 @@ export class CalypshomeAPI extends EventEmitter {
         this.logger.info('Connecting WebSocket');
         // const START_TIMESTAMP = Math.round(new Date().getTime() / 1000);
         this.ws = new WebSocket(this.wsUrl, 'lws-mirror-protocol');
-        this.ws.onopen = (event) => {
-            this.logger.info('WebSocket connected', event);
+        this.ws.on('open', () => {
+            this.logger.info('WebSocket connected');
             this.ws.send('p1 1 _web / login');
-        };
-        this.ws.onclose = (event) => {
-            this.logger.warn('WebSocket onclose() retrying in 30s', event);
+        });
+        this.ws.on('close', () => {
+            this.logger.warn('WebSocket onclose() retrying in 30s');
             setTimeout(() => {
                 this.connectWebSocket();
             }, 30000);
-        };
-        this.ws.onerror = (event) => {
+        });
+        this.ws.on('error', (event) => {
             this.logger.error('WebSocket error', event);
-        };
-        this.ws.onmessage = (event) => {
-            this.handleWebSocketMessage(event as MessageEvent<string>);
-        };
+        });
+        this.ws.on('message', (event) => {
+            this.handleWebSocketMessage((event as Buffer).toString('utf-8'));
+        });
     }
 
-    private handleWebSocketMessage(event: MessageEvent<string>) {
-        const [, , src, dest, cmd, rest, b64, value] = event.data.split(' ');
+    private handleWebSocketMessage(data: string) {
+        const [, , src, dest, cmd, rest, b64, value] = data.split(' ');
         // decode base64
         const message = b64.startsWith('@') ? Buffer.from(b64.substring(1), 'base64').toString() : b64;
         const sysmatch = message.match(/^event\/system\/gateway\/dev-\d\/id-self\/(.*)/);
@@ -164,7 +165,7 @@ export class CalypshomeAPI extends EventEmitter {
             if (['uptime', 'cpu_idle', 'disk_free', 'memory_free', 'load_5', 'system_uptime'].includes(sysmatch[1]) || sysmatch[1].startsWith('gw_')) {
                 return;
             }
-            this.logger.info('WebSocket system message', event.data, { match: sysmatch[1], value });
+            this.logger.info('WebSocket system message', data, { match: sysmatch[1], value });
             return;
         }
         const devmatch = message.match(/^event\/io\/ezsp\/dev-\d\/([^/]+)\/(level|angle|status)/);
@@ -175,11 +176,11 @@ export class CalypshomeAPI extends EventEmitter {
                 this.update(matchedDevice, type as 'level' | 'angle' | 'status', value);
                 return;
             }
-            this.logger.warn('WebSocket dev message', event.data, { device, type });
+            this.logger.warn('WebSocket dev message', data, { device, type });
 
             return;
         }
-        this.logger.warn('WebSocket unknown message', event.data, { src, dest, cmd, rest, message, value });
+        this.logger.warn('WebSocket unknown message', data, { src, dest, cmd, rest, message, value });
     }
 
     update(device: RollingShutter, key: 'angle' | 'level' | 'status', value: string) {
