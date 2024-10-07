@@ -1,41 +1,9 @@
 import { Logging } from 'homebridge';
 import { EventEmitter } from 'events';
 import { Agent, request } from 'undici';
-import { z } from 'zod';
 import { RollingShutter } from './rollingShutter';
-import WebSocket from 'ws'; // can be replaced with native node later
-
-export const getObjectsSchema = z.object({
-    objects: z.array(
-        z.object({
-            room: z.object({
-                id: z.number(),
-                name: z.string(),
-            }),
-            id: z.string(),
-            status: z.array(
-                z.object({
-                    value: z.string(),
-                    name: z.string(),
-                    time: z.string(),
-                })
-            ),
-            categories: z.unknown(),
-            name: z.string(),
-            type: z.enum(['Rolling_Shutter', 'Composite', 'EZSP']),
-            img: z.string(),
-            gw: z.string(),
-            eventId: z.string(),
-            connected: z.boolean(),
-            actions: z.array(z.enum(['OPEN', 'CLOSE', 'STOP', 'LEVEL', 'TILT', 'SCAN', 'JOIN'])),
-        })
-    ),
-});
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export declare interface CalypshomeAPI {
-    on(event: typeof CalypshomeAPI.DEVICE_UPDATE, listener: (device: RollingShutter, type: 'angle' | 'level' | 'status') => void): this;
-}
+import WebSocket from 'ws';
+import { getObjectsResponseSchema } from './api/getObjectsResponseSchema'; // can be replaced with native node later
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CalypshomeAPI extends EventEmitter {
@@ -46,13 +14,9 @@ export class CalypshomeAPI extends EventEmitter {
 
     constructor(
         private config: { url: string },
-        public readonly logger: Logging
+        private readonly logger: Logging
     ) {
         super();
-    }
-
-    close() {
-        this.ws?.close();
     }
 
     async devices(): Promise<RollingShutter[]> {
@@ -63,7 +27,7 @@ export class CalypshomeAPI extends EventEmitter {
         })
             .then((x) => x.body.json())
             .then((data) =>
-                getObjectsSchema
+                getObjectsResponseSchema
                     .parse(data)
                     .objects.filter((entry) => entry.type === 'Rolling_Shutter')
                     .map((g) => new RollingShutter(g))
@@ -189,4 +153,13 @@ export class CalypshomeAPI extends EventEmitter {
 
         this.emit(CalypshomeAPI.DEVICE_UPDATE, device, key);
     }
+
+    close() {
+        this.ws?.close();
+    }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export declare interface CalypshomeAPI {
+    on(event: typeof CalypshomeAPI.DEVICE_UPDATE, listener: (device: RollingShutter, type: 'angle' | 'level' | 'status') => void): this;
 }

@@ -1,16 +1,17 @@
 import { z } from 'zod';
-import { getObjectsSchema } from './calypshomeAPI';
+
+import { getObjectsResponseSchema } from './api/getObjectsResponseSchema';
 
 export class RollingShutter {
     id: string;
-    actions: Exclude<z.infer<typeof getObjectsSchema>['objects'][number]['actions'], 'SCAN' | 'JOIN'>;
+    actions: Exclude<z.infer<typeof getObjectsResponseSchema>['objects'][number]['actions'], 'SCAN' | 'JOIN'>;
     name: string;
     angle: number | undefined;
     level: number | undefined;
     manufacturerName: string;
     serialNumber: string;
 
-    constructor(data: z.infer<typeof getObjectsSchema>['objects'][number]) {
+    constructor(data: z.infer<typeof getObjectsResponseSchema>['objects'][number]) {
         this.id = data.id;
         this.name = data.name;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
