@@ -1,18 +1,20 @@
 {
   "compilerOptions": {
-    "target": "ES2018", // ~node10
+    "baseUrl": ".",
+    "target": "es2022",
     "module": "commonjs",
+    "moduleResolution": "Node",
     "lib": [
       "esnext","dom"
     ],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "outDir": "dist",
+    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "noImplicitAny": false
+    "noImplicitAny": true
   },
   "include": [
     "src/"
