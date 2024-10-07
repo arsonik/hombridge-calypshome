@@ -39,20 +39,16 @@ export declare interface CalypshomeAPI {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CalypshomeAPI extends EventEmitter {
-    private url: string;
-    private wsUrl: string;
     private inMemoryDevices: Record<RollingShutter['id'], RollingShutter> = {};
-    private declare ws: WebSocket;
+    private ws: WebSocket | undefined = undefined;
 
     static DEVICE_UPDATE = 'device_update';
 
     constructor(
-        config: { url: string },
+        private config: { url: string },
         public readonly logger: Logging
     ) {
         super();
-        this.url = config.url;
-        this.wsUrl = `${config.url.replace('http', 'ws')}/ws`;
     }
 
     close() {
@@ -60,7 +56,7 @@ export class CalypshomeAPI extends EventEmitter {
     }
 
     async devices(): Promise<RollingShutter[]> {
-        return this.apiCall(`${this.url}/m?a=getObjects`, {
+        return this.apiCall(`${this.config.url}/m?a=getObjects`, {
             headers: {
                 Accept: 'application/json',
             },
@@ -85,7 +81,7 @@ export class CalypshomeAPI extends EventEmitter {
     }
 
     async action(id: string, action: 'STOP' | 'CLOSE' | 'OPEN' | 'LEVEL' | 'TILT', args?: Record<string, string>): Promise<boolean> {
-        return this.apiCall(`${this.url}/m?a=command`, {
+        return this.apiCall(`${this.config.url}/m?a=command`, {
             body: new URLSearchParams({
                 id,
                 action,
@@ -133,21 +129,22 @@ export class CalypshomeAPI extends EventEmitter {
     connectWebSocket() {
         this.logger.info('Connecting WebSocket');
         // const START_TIMESTAMP = Math.round(new Date().getTime() / 1000);
-        this.ws = new WebSocket(this.wsUrl, 'lws-mirror-protocol');
-        this.ws.on('open', () => {
+        const ws = new WebSocket(`${this.config.url.replace('http', 'ws')}/ws`, 'lws-mirror-protocol');
+        this.ws = ws;
+        ws.on('open', () => {
             this.logger.info('WebSocket connected');
-            this.ws.send('p1 1 _web / login');
+            ws?.send('p1 1 _web / login');
         });
-        this.ws.on('close', () => {
+        ws.on('close', () => {
             this.logger.warn('WebSocket onclose() retrying in 30s');
             setTimeout(() => {
                 this.connectWebSocket();
             }, 30000);
         });
-        this.ws.on('error', (event) => {
+        ws.on('error', (event) => {
             this.logger.error('WebSocket error', event);
         });
-        this.ws.on('message', (event) => {
+        ws.on('message', (event) => {
             this.handleWebSocketMessage((event as Buffer).toString('utf-8'));
         });
     }
