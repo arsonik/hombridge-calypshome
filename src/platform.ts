@@ -13,8 +13,6 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         readonly config: PlatformConfig,
         readonly api: API
     ) {
-        this.log.info('Booting CalypsHome platform');
-
         this.calypshome = new CalypshomeAPI(config as unknown as { url: string }, log);
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         this.api.on(APIEvent.DID_FINISH_LAUNCHING, this.discoverDevices.bind(this));
@@ -37,12 +35,15 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
 
         switch (type) {
             case 'level':
+                this.log.debug('Updating level', device.name, device.level);
                 accessory.getCharacteristic(this.api.hap.Characteristic.CurrentPosition).updateValue(device.level!);
                 break;
             case 'angle':
+                this.log.debug('Updating angle', device.name, device.angle);
                 accessory.getCharacteristic(this.api.hap.Characteristic.CurrentHorizontalTiltAngle).updateValue(device.angle!);
                 break;
             case 'status':
+                this.log.debug('Updating status', device.name, device.level);
                 // accessory.getCharacteristic(this.api.hap.Characteristic.PositionState).updateValue(this.api.hap.Characteristic.PositionState.STOPPED);
                 break;
             default:
@@ -54,16 +55,14 @@ export class CalypshomePlatform implements DynamicPlatformPlugin {
         return this.calypshome
             .devices()
             .then((devices) => {
+                this.calypshome.connectWebSocket();
                 if (!devices.length) {
                     return { add: [], update: [], remove: [] };
                 }
-                this.calypshome.connectWebSocket();
                 const remove = this.accessories.filter((acc) => !devices.some((device) => this.api.hap.uuid.generate(device.id) === acc.UUID));
-
-                this.log.info(
-                    'Devices:',
-                    devices.map((d) => d.id)
-                );
+                devices.forEach((d) => {
+                    this.log.info(`${d.serialNumber} - ${d.name}`);
+                });
 
                 return devices.reduce(
                     (acc, device) => {
